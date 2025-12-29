@@ -1,4 +1,4 @@
-from Deliverable_3_1.MPCControl_base import MPCControl_base
+from .MPCControl_base import MPCControl_base
 import numpy as np
 from control import dlqr
 import cvxpy as cp

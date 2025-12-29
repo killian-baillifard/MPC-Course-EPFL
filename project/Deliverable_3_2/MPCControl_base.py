@@ -102,8 +102,9 @@ class MPCControl_base:
 		u_traj = np.zeros((self.NU, self.N))
 
 		# Compute steady state error
+		self.xs_par.value = (self.xs + x_target).reshape(self.NX, 1)
 		x_traj[:, 0] = x0
-		dxk = x0 - self.xs
+		dxk = x0 - self.xs - x_target
 
 		# Closed-loop simulation
 		for k in range(self.N):
@@ -118,7 +119,7 @@ class MPCControl_base:
 			dxk = self.A @ dxk + self.B @ duk
 
 			# Save trajectory
-			x_traj[:, k + 1] = dxk + self.xs
+			x_traj[:, k + 1] = dxk + self.xs + x_target
 			u_traj[:, k] = duk + self.us
 
 		# Return predicted input and trajectories
