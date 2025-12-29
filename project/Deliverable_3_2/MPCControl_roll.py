@@ -1,16 +1,16 @@
-from .MPCControl_base import MPCControl_base
+from Deliverable_3_1.MPCControl_base import MPCControl_base
 import numpy as np
 import cvxpy as cp
 from cvxpy import Expression, Constraint
 
-class MPCControl_zvel(MPCControl_base):
+class MPCControl_roll(MPCControl_base):
 
-	x_ids = np.array([8])
-	u_ids = np.array([2])
+	x_ids = np.array([2, 5])
+	u_ids = np.array([3])
 
 	def _get_stage_cost(self) -> tuple[np.ndarray, np.ndarray]:
-		Q = np.diag([1e0])
-		R = np.diag([1e-2])
+		Q = np.diag([1e2, 1e4])
+		R = np.diag([1e-4])
 		return Q, R
 
 	def _get_terminal_cost_and_constraints(self) -> tuple[Expression, list[Constraint]]:
@@ -21,8 +21,8 @@ class MPCControl_zvel(MPCControl_base):
 
 		# Define constraints
 		constraints = [
-			self.u_var	>= 40.0,	# P_avg >= 40% 
-			self.u_var	<= 80.0		# P_avg <= 80%
+			self.u_var	>= -20.0,	# P_diff >= -20%
+			self.u_var	<= +20.0	# P_diff <= +20%
 		]
 	
 		# Return cost and constraints

@@ -10,22 +10,20 @@ class MPCControl_xvel(MPCControl_base):
 	x_ids = np.array([1, 4, 6])
 	u_ids = np.array([1])
 
-	def _get_cost_and_constraints(self) -> tuple[Expression, list[Constraint]]:
-		
-		# Define stage cost
-		Q = np.diag([1.0, 1.0, 1.0])
-		R = np.diag([1.0])
+	def _get_stage_cost(self) -> tuple[np.ndarray, np.ndarray]:
+		Q = np.diag([5e-1, 5e-1, 5e-1])
+		R = np.diag([5e1])
+		return Q, R
+
+	def _get_terminal_cost_and_constraints(self) -> tuple[Expression, list[Constraint]]:
 
 		# Compute terminal controller
+		Q, R = self._get_stage_cost()
 		K, Qf, _ = dlqr(self.A, self.B, Q, R)
 		K = -K
 
-		# Define trajectory cost
-		cost = 0
-		for i in range(self.N):
-			cost += cp.quad_form(self.dx_var[:, i], Q)
-			cost += cp.quad_form(self.du_var[:, i], R)
-		cost += cp.quad_form(self.dx_var[:, -1], Qf)
+		# Define terminal cost
+		terminalCost = cp.quad_form(self.dx_var[:, -1], Qf)
 		
 		# Define state constraints
 		F = np.array([
@@ -33,8 +31,8 @@ class MPCControl_xvel(MPCControl_base):
 			[0.0, -1.0, 0.0] 		# beta >= -10°
 		])
 		f = np.array([
-			np.pi / 18.0,			# beta <= +10°
-			np.pi / 18.0			# beta >= -10°
+			np.deg2rad(10.0),		# beta <= +10°
+			np.deg2rad(10.0)		# beta >= -10°
 		])
 		X = Polyhedron.from_Hrep(F, f)
 		
@@ -44,8 +42,8 @@ class MPCControl_xvel(MPCControl_base):
 			[-1.0]					# delta_2 >= -15°
 		])
 		g = np.array([
-			np.pi / 12.0,			# delta_2 <= +15°
-			np.pi / 12.0			# delta_2 >= -15°
+			np.deg2rad(15.0),		# delta_2 <= +15°
+			np.deg2rad(15.0)		# delta_2 >= -15°
 		])
 		U = Polyhedron.from_Hrep(G, g)
 
@@ -53,21 +51,14 @@ class MPCControl_xvel(MPCControl_base):
 		A_cl = self.A + self.B @ K
 		O = X.intersect(Polyhedron.from_Hrep(U.A @ K, U.b))
 		O = self._max_invariant_set(O, A_cl)
+		self.O_inf = O
 
 		# Define constraints
 		constraints = [
-
-			# Dynamics with delta formulation
-			self.dx_var					== self.x_var - self.xs_par,
-			self.du_var					== self.u_var - self.us_par,
-			self.dx_var[:, 0] 			== self.dx0_par[:, 0],
-			self.dx_var[:, 1:] 			== self.A @ self.dx_var[:, :-1] + self.B @ self.du_var,
-
-			# State, input and terminal constraints
-			X.A @ self.x_var[:, :-1] 	<= X.b.reshape(-1, 1),	# State lies in state constraints
-			U.A @ self.u_var 			<= U.b.reshape(-1, 1),	# Input lies in input constraints
-			O.A @ self.x_var[:, -1] 	<= O.b.reshape(-1, 1)	# Final state lies in terminal set
+			X.A @ self.x_var[:, :-1]	<= X.b.reshape(-1, 1),	# State lies in state constraints
+			U.A @ self.u_var			<= U.b.reshape(-1, 1),	# Input lies in input constraints
+			O.A @ self.x_var[:, -1]		<= O.b.reshape(-1, 1)	# Final state lies in terminal set
 		]
 
 		# Return cost and constraints
-		return cost, constraints
+		return terminalCost, constraints

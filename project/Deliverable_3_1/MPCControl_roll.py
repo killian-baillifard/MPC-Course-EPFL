@@ -8,32 +8,22 @@ class MPCControl_roll(MPCControl_base):
 	x_ids = np.array([2, 5])
 	u_ids = np.array([3])
 
-	def _get_cost_and_constraints(self) -> tuple[Expression, list[Constraint]]:
-		
-		# Define stage cost
-		Q = np.diag([0.5, 10.0])
-		R = np.diag([0.5])
+	def _get_stage_cost(self) -> tuple[np.ndarray, np.ndarray]:
+		Q = np.diag([1e2, 1e4])
+		R = np.diag([1e-4])
+		return Q, R
 
-		# Define trajectory cost
-		cost = 0
-		for i in range(self.N):
-			cost += cp.quad_form(self.dx_var[:, i], Q)
-			cost += cp.quad_form(self.du_var[:, i], R)
-		cost += cp.quad_form(self.dx_var[:, -1], Q)
+	def _get_terminal_cost_and_constraints(self) -> tuple[Expression, list[Constraint]]:
+
+		# Define terminal cost
+		Q, _ = self._get_stage_cost()
+		terminalCost = cp.quad_form(self.dx_var[:, -1], Q)
 
 		# Define constraints
 		constraints = [
-			
-			# Dynamics with delta formulation
-			self.dx_var			== self.x_var - self.xs_par,
-			self.du_var			== self.u_var - self.us_par,
-			self.dx_var[:, 0] 	== self.dx0_par[:, 0],
-			self.dx_var[:, 1:] 	== self.A @ self.dx_var[:, :-1] + self.B @ self.du_var,
-
-			# Input constraints
-			self.u_var			>= -20.0,	# P_diff >= -20%
-			self.u_var			<= +20.0	# P_diff <= +20%
+			self.u_var	>= -20.0,	# P_diff >= -20%
+			self.u_var	<= +20.0	# P_diff <= +20%
 		]
 	
 		# Return cost and constraints
-		return cost, constraints
+		return terminalCost, constraints

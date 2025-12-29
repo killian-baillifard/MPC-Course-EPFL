@@ -102,7 +102,6 @@ class MPCControl_base:
 		u_traj = np.zeros((self.NU, self.N))
 
 		# Compute steady state error
-		self.xs_par.value = self.xs.reshape(self.NX, 1)
 		x_traj[:, 0] = x0
 		dxk = x0 - self.xs
 

@@ -1,14 +1,14 @@
-from .MPCControl_base import MPCControl_base
+from Deliverable_3_1.MPCControl_base import MPCControl_base
 import numpy as np
 from control import dlqr
 import cvxpy as cp
 from cvxpy import Expression, Constraint
 from mpt4py import Polyhedron
 
-class MPCControl_yvel(MPCControl_base):
+class MPCControl_xvel(MPCControl_base):
 
-	x_ids = np.array([0, 3, 7])
-	u_ids = np.array([0])
+	x_ids = np.array([1, 4, 6])
+	u_ids = np.array([1])
 
 	def _get_stage_cost(self) -> tuple[np.ndarray, np.ndarray]:
 		Q = np.diag([5e-1, 5e-1, 5e-1])
@@ -16,7 +16,7 @@ class MPCControl_yvel(MPCControl_base):
 		return Q, R
 
 	def _get_terminal_cost_and_constraints(self) -> tuple[Expression, list[Constraint]]:
-		
+
 		# Compute terminal controller
 		Q, R = self._get_stage_cost()
 		K, Qf, _ = dlqr(self.A, self.B, Q, R)
@@ -27,23 +27,23 @@ class MPCControl_yvel(MPCControl_base):
 		
 		# Define state constraints
 		F = np.array([
-			[0.0, +1.0, 0.0], 		# alpha <= +10°
-			[0.0, -1.0, 0.0] 		# alpha >= -10°
+			[0.0, +1.0, 0.0], 		# beta <= +10°
+			[0.0, -1.0, 0.0] 		# beta >= -10°
 		])
 		f = np.array([
-			np.deg2rad(10.0),		# alpha <= +10°
-			np.deg2rad(10.0)		# alpha >= -10°
+			np.deg2rad(10.0),		# beta <= +10°
+			np.deg2rad(10.0)		# beta >= -10°
 		])
 		X = Polyhedron.from_Hrep(F, f)
 		
 		# Define input constraints
 		G = np.array([
-			[+1.0],					# delta_1 <= +15°
-			[-1.0]					# delta_1 >= -15°
+			[+1.0],					# delta_2 <= +15°
+			[-1.0]					# delta_2 >= -15°
 		])
 		g = np.array([
-			np.deg2rad(15.0),		# delta_1 <= +15°
-			np.deg2rad(15.0)		# delta_1 >= -15°
+			np.deg2rad(15.0),		# delta_2 <= +15°
+			np.deg2rad(15.0)		# delta_2 >= -15°
 		])
 		U = Polyhedron.from_Hrep(G, g)
 
