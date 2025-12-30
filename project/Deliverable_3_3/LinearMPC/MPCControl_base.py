@@ -21,6 +21,7 @@ class MPCControl_base:
 	) -> None:
 		
 		# Save controller configuration
+
 		self.N = int(H / Ts)
 		self.NX = self.x_ids.shape[0]
 		self.NU = self.u_ids.shape[0]
@@ -29,22 +30,25 @@ class MPCControl_base:
 		self.us = us[self.u_ids]
 
 		# Extract subset of discretized states and inputs
+
 		subA = A[np.meshgrid(self.x_ids, self.x_ids)].T
 		subB = B[np.meshgrid(self.x_ids, self.u_ids)].T
 		self.A, self.B = self._discretize(subA, subB, Ts)
 
 		# Create optimization variables and parameters with delta formulation
-		self.x_var 			= cp.Variable((self.NX, self.N + 1), name='x')
-		self.dx_var			= cp.Variable((self.NX, self.N + 1), name='dx')
-		self.xs_par			= cp.Parameter((self.NX, 1), name='xs')
-		self.u_var 			= cp.Variable((self.NU, self.N), name='u')
-		self.du_var			= cp.Variable((self.NU, self.N), name='du')
-		self.us_par			= cp.Parameter((self.NU, 1), name='us')
-		self.dx0_par		= cp.Parameter((self.NX, 1), name='dx0')
-		self.xs_par.value 	= self.xs.reshape(self.NX, 1)
-		self.us_par.value 	= self.us.reshape(self.NU, 1)
+
+		self.xs_cst	 = cp.Constant(self.xs.reshape(self.NX, 1), name='xs')
+		self.x_var 	 = cp.Variable((self.NX, self.N + 1), name='x')
+		self.dx_var	 = cp.Variable((self.NX, self.N + 1), name='dx')
+		self.x0_par	 = cp.Parameter((self.NX, 1), name='x0')
+		self.xt_par  = cp.Parameter((self.NX, 1), name='xt')
+
+		self.us_cst	= cp.Constant(self.us.reshape(self.NU, 1), name='us')
+		self.u_var 	= cp.Variable((self.NU, self.N), name='u')
+		self.du_var	= cp.Variable((self.NU, self.N), name='du')
 
 		# Define trajectory cost
+
 		Q, R = self._get_stage_cost()
 		cost = 0
 		for i in range(self.N):
@@ -52,14 +56,16 @@ class MPCControl_base:
 			cost += cp.quad_form(self.du_var[:, i], R)
 
 		# Define delta formulation
+
 		dynamics = [
-			self.dx_var			== self.x_var - self.xs_par,
-			self.du_var			== self.u_var - self.us_par,
-			self.dx_var[:, 0] 	== self.dx0_par[:, 0],
+			self.dx_var			== self.x_var - self.xs_cst - self.xt_par,
+			self.du_var			== self.u_var - self.us_cst,
+			self.dx_var[:, 0] 	== self.x0_par[:, 0] - self.xs_cst[:, 0] - self.xt_par[:, 0],
 			self.dx_var[:, 1:] 	== self.A @ self.dx_var[:, :-1] + self.B @ self.du_var,
 		]
 
 		# Create optimization problem
+
 		terminalCost, constraints = self._get_terminal_cost_and_constraints()
 		self.ocp = cp.Problem(cp.Minimize(cost + terminalCost), dynamics + constraints)
 
@@ -98,30 +104,31 @@ class MPCControl_base:
 	) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
 		
 		# Allocate outputs
+
 		x_traj = np.zeros((self.NX, self.N + 1))
 		u_traj = np.zeros((self.NU, self.N))
-
-		# Compute steady state error
-		self.xs_par.value = (self.xs + x_target).reshape(self.NX, 1)
 		x_traj[:, 0] = x0
-		dxk = x0 - self.xs - x_target
+
+		# Set target
+
+		self.xt_par.value = x_target.reshape(self.NX, 1)
 
 		# Closed-loop simulation
+
 		for k in range(self.N):
 
 			# Solve step
-			self.dx0_par.value = dxk.reshape(self.NX, 1)
+
+			self.x0_par.value = x_traj[:, k].reshape(self.NX, 1)
 			self.ocp.solve(solver=cp.PIQP)
 			assert self.ocp.status == cp.OPTIMAL
 
-			# Simulate next state
-			duk = self.du_var.value[:, 0]
-			dxk = self.A @ dxk + self.B @ duk
-
 			# Save trajectory
-			x_traj[:, k + 1] = dxk + self.xs + x_target
-			u_traj[:, k] = duk + self.us
+
+			x_traj[:, k + 1] = self.x_var.value[:, 1]
+			u_traj[:, k] = self.u_var.value[:, 0]
 
 		# Return predicted input and trajectories
+
 		u0 = u_traj[:, 0]
 		return u0, x_traj, u_traj

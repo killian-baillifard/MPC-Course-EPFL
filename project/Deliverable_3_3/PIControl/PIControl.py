@@ -1,6 +1,6 @@
 import numpy as np
 
-from .PIControl_base import *
+from PIControl.PIControl_base import *
 
 
 class PIControl:
