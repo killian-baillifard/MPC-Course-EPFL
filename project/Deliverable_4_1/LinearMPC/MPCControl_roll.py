@@ -9,7 +9,7 @@ OMEGA_GAMMA_TYP = 30.0 				# °/s
 GAMMA_TYP 		= 1.0 				# °
 P_DIFF_TYP 		= P_DIFF_MAX / 2.0 	# %
 
-AGGRESSIVENESS 	= 0.0
+LAMBDA 	= 0.0
 
 class MPCControl_roll(MPCControl_base):
 
@@ -17,11 +17,11 @@ class MPCControl_roll(MPCControl_base):
 	u_ids = np.array([3])
 
 	def _get_stage_cost(self) -> tuple[np.ndarray, np.ndarray]:
-		Q = np.exp(AGGRESSIVENESS) * np.diag([
+		Q = np.exp(LAMBDA) * np.diag([
 			1.0 / np.deg2rad(OMEGA_GAMMA_TYP)**2,	# omega_gamma cost
 			1.0 / np.deg2rad(GAMMA_TYP)**2			# gamma cost
 		])
-		R = np.exp(-AGGRESSIVENESS) * np.diag([
+		R = np.exp(-LAMBDA) * np.diag([
 			1.0 / P_DIFF_TYP**2						# P_diff cost
 		])
 		return Q, R

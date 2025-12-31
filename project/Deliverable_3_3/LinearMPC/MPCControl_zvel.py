@@ -9,7 +9,7 @@ P_AVG_MAX 		= 80.0	# %
 V_Z_TYP 		= 1.0	# m/s
 DP_AVG_TYP 		= 10.0	# %
 
-AGGRESSIVENESS 	= 0.0
+LAMBDA 	= 0.0
 
 class MPCControl_zvel(MPCControl_base):
 
@@ -17,10 +17,10 @@ class MPCControl_zvel(MPCControl_base):
 	u_ids = np.array([2])
 
 	def _get_stage_cost(self) -> tuple[np.ndarray, np.ndarray]:
-		Q = np.exp(AGGRESSIVENESS) * np.diag([
+		Q = np.exp(LAMBDA) * np.diag([
 			1.0 / V_Z_TYP**2		# v_z cost
 		])
-		R = np.exp(-AGGRESSIVENESS) * np.diag([
+		R = np.exp(-LAMBDA) * np.diag([
 			1.0 / DP_AVG_TYP**2		# P_avg cost
 		])
 		return Q, R

@@ -13,7 +13,7 @@ ALPHA_TYP 		= ALPHA_MAX / 2.0		# °
 V_Y_TYP 		= 1.0					# m/s
 DELTA_1_TYP 	= DELTA_1_MAX / 2.0		# °
 
-AGGRESSIVENESS 	= 0.0
+LAMBDA 	= 0.0
 
 class MPCControl_yvel(MPCControl_base):
 
@@ -21,12 +21,12 @@ class MPCControl_yvel(MPCControl_base):
 	u_ids = np.array([0])
 
 	def _get_stage_cost(self) -> tuple[np.ndarray, np.ndarray]:
-		Q = np.exp(AGGRESSIVENESS) * np.diag([
+		Q = np.exp(LAMBDA) * np.diag([
 			1.0 / np.deg2rad(OMEGA_ALPHA_TYP)**2,	# omega_alpha cost
 			1.0 / np.deg2rad(ALPHA_TYP)**2,			# alpha cost
 			1.0 / V_Y_TYP**2						# v_y cost
 		])
-		R = np.exp(-AGGRESSIVENESS) * np.diag([
+		R = np.exp(-LAMBDA) * np.diag([
 			1.0 / np.deg2rad(DELTA_1_TYP)**2		# delta_1 cost
 		])
 		return Q, R
@@ -70,17 +70,17 @@ class MPCControl_yvel(MPCControl_base):
 		self.O_inf = O
 
 		# Define constraints with slack variable
-		self.e_var = cp.Variable((f.size, self.N), 'e', nonneg=True)
+		self.epsilon_var = cp.Variable((f.size, self.N), 'epsilon', nonneg=True)
 		constraints = [
-			X.A @ self.x_var[:, :-1]	<= X.b.reshape(-1, 1) + self.e_var,	# State penalized for violating constraints
-			U.A @ self.u_var			<= U.b.reshape(-1, 1),				# Input lies in input constraints
-			O.A @ self.x_var[:, -1]		<= O.b.reshape(-1, 1)				# Final state lies in terminal set
+			X.A @ self.x_var[:, :-1]	<= X.b.reshape(-1, 1) + self.epsilon_var,	# State penalized for violating constraints
+			U.A @ self.u_var			<= U.b.reshape(-1, 1),						# Input lies in input constraints
+			O.A @ self.x_var[:, -1]		<= O.b.reshape(-1, 1)						# Final state lies in terminal set
 		]
 
 		# Add slack cost
-		E_COST = 10.0 / np.deg2rad(ALPHA_MAX)**2
+		S = 10.0 / np.deg2rad(ALPHA_MAX)**2
 		for i in range(self.N):
-			terminalCost += E_COST * cp.norm1(self.e_var[:, i])
+			terminalCost += S * cp.norm1(self.epsilon_var[:, i])
 
 		# Return cost and constraints
 		return terminalCost, constraints

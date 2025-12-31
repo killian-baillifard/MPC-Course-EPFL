@@ -13,7 +13,7 @@ ALPHA_TYP 		= ALPHA_MAX / 2.0		# °
 V_Y_TYP 		= 1.0					# m/s
 DELTA_1_TYP 	= DELTA_1_MAX / 2.0		# °
 
-AGGRESSIVENESS 	= 0.0
+LAMBDA 	= 0.0
 
 class MPCControl_yvel(MPCControl_base):
 
@@ -21,12 +21,12 @@ class MPCControl_yvel(MPCControl_base):
 	u_ids = np.array([0])
 
 	def _get_stage_cost(self) -> tuple[np.ndarray, np.ndarray]:
-		Q = np.exp(AGGRESSIVENESS) * np.diag([
+		Q = np.exp(LAMBDA) * np.diag([
 			1.0 / np.deg2rad(OMEGA_ALPHA_TYP)**2,	# omega_alpha cost
 			1.0 / np.deg2rad(ALPHA_TYP)**2,			# alpha cost
 			1.0 / V_Y_TYP**2						# v_y cost
 		])
-		R = np.exp(-AGGRESSIVENESS) * np.diag([
+		R = np.exp(-LAMBDA) * np.diag([
 			1.0 / np.deg2rad(DELTA_1_TYP)**2		# delta_1 cost
 		])
 		return Q, R
