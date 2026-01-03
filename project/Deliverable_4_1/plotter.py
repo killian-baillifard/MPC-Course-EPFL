@@ -5,8 +5,10 @@ from LinearMPC.MPCVelControl import MPCVelControl
 import os
 
 def start_fig(name: str) -> None:
-    FIGS_SIZES = (10, 5)
+    FIGS_SIZES = (10, 4.2)
     plt.close('all')
+    plt.rcParams['mathtext.fontset'] = 'dejavuserif'
+    plt.rcParams['font.family'] = 'serif'
     plt.figure(name, FIGS_SIZES)
 
 def file_name(name: str) -> str:
@@ -19,7 +21,7 @@ def file_name(name: str) -> str:
 
 def save_fig(name: str) -> None:
     PLOT_DIR = 'plots/'
-    plt.tight_layout()
+    plt.tight_layout(pad=0.5)
     os.makedirs(PLOT_DIR, exist_ok=True)
     plt.savefig(PLOT_DIR + file_name(name), dpi=200)
     plt.show()
@@ -35,11 +37,13 @@ def plot_x_y_terminal_set(name: str, mpc: MPCVelControl) -> None:
 
     ax = plt.subplot(221)
     mpc.mpc_x.O_inf.projection((1, 0)).plot(ax, color=X_COLOR, opacity=OPACITY)
+    ax.set_xticklabels([])
     plt.ylabel(r'$\omega_y \quad (\frac{\text{rad}}{\text{s}})$')
     plt.grid()
 
     ax = plt.subplot(222)
     mpc.mpc_y.O_inf.projection((1, 0)).plot(ax, color=Y_COLOR, opacity=OPACITY)
+    ax.set_xticklabels([])
     plt.ylabel(r'$\omega_x \quad (\frac{\text{rad}}{\text{s}})$')
     plt.grid()
 
@@ -48,6 +52,7 @@ def plot_x_y_terminal_set(name: str, mpc: MPCVelControl) -> None:
     ax = plt.subplot(223)
     mpc.mpc_x.O_inf.projection((1, 2)).plot(ax, color=X_COLOR, opacity=OPACITY)
     plt.xlabel(r'$\beta \quad (rad)$')
+    
     plt.ylabel(r'$v_x \quad (\frac{\text{m}}{\text{s}})$')
     plt.grid()
 
@@ -91,9 +96,6 @@ def plot_traj(name: str, x: np.ndarray, u: np.ndarray, t: np.ndarray, ref: np.nd
     LIMITS_WIDTH = 2.5
     REF_WIDTH = 1.0
 
-    plt.rcParams['mathtext.fontset'] = 'dejavuserif'
-    plt.rcParams['font.family'] = 'serif'
-
     # Linear states
 
     ax = plt.subplot(231)
@@ -104,9 +106,10 @@ def plot_traj(name: str, x: np.ndarray, u: np.ndarray, t: np.ndarray, ref: np.nd
     ax.plot(t[:-1], x[6, :-1], color=X_COLOR, linestyle=PRIMARY_STYLE, label=r'$v_x$')
     ax.plot(t[:-1], x[7, :-1], color=Y_COLOR, linestyle=SECONDARY_STYLE, label=r'$v_y$')
     ax.plot(t[:-1], x[8, :-1], color=Z_COLOR, label=r'$v_z$')
+    ax.set_xticklabels([])
     ax.set_ylabel(r'$\boldsymbol{v} \quad (\frac{\text{m}}{\text{s}})$')
     ax.grid()
-    ax.legend()
+    ax.legend(loc='lower right')
     enforce_min_yrange(ax)
 
     ax = plt.subplot(234)
@@ -120,7 +123,7 @@ def plot_traj(name: str, x: np.ndarray, u: np.ndarray, t: np.ndarray, ref: np.nd
     ax.set_xlabel(r'$t \quad (s)$')
     ax.set_ylabel(r'$\boldsymbol{p} \quad (\text{m})$')
     ax.grid()
-    ax.legend()
+    ax.legend(loc='upper right')
     enforce_min_yrange(ax)
 
     # Angular states
@@ -133,9 +136,10 @@ def plot_traj(name: str, x: np.ndarray, u: np.ndarray, t: np.ndarray, ref: np.nd
     ax.plot(t[:-1], np.rad2deg(x[0, :-1]), color=X_COLOR, label=r'$\omega_x$')
     ax.plot(t[:-1], np.rad2deg(x[1, :-1]), color=Y_COLOR, label=r'$\omega_y$')
     ax.plot(t[:-1], np.rad2deg(x[2, :-1]), color=Z_COLOR, label=r'$\omega_z$')
+    ax.set_xticklabels([])
     ax.set_ylabel(r'$\boldsymbol{\omega} \quad (\frac{^\circ}{\text{s}})$')
     ax.grid()
-    ax.legend()
+    ax.legend(loc='upper right')
     enforce_min_yrange(ax)
 
     ax = plt.subplot(235)
@@ -148,11 +152,10 @@ def plot_traj(name: str, x: np.ndarray, u: np.ndarray, t: np.ndarray, ref: np.nd
     ax.plot(t[:-1], np.rad2deg(x[3, :-1]), color=X_COLOR, label=r'$\alpha$')
     ax.plot(t[:-1], np.rad2deg(x[4, :-1]), color=Y_COLOR, label=r'$\beta$')
     ax.plot(t[:-1], np.rad2deg(x[5, :-1]), color=Z_COLOR, label=r'$\gamma$')
-    ax.set_yticks(np.arange(-10, 30 + 1, 10))
     ax.set_xlabel(r'$t \quad (s)$')
     ax.set_ylabel(r'$\boldsymbol{\varphi} \quad (^\circ)$')
     ax.grid()
-    ax.legend()
+    ax.legend(loc='upper right')
     enforce_min_yrange(ax)
 
     # Inputs
@@ -160,12 +163,13 @@ def plot_traj(name: str, x: np.ndarray, u: np.ndarray, t: np.ndarray, ref: np.nd
     ax = plt.subplot(233)
     ax.axhline(15, color=LIMITS_COLOR, linestyle=LIMITS_STYLE, linewidth=LIMITS_WIDTH)
     ax.axhline(-15, color=LIMITS_COLOR, linestyle=LIMITS_STYLE, linewidth=LIMITS_WIDTH)
-    ax.plot(t[:-1], np.rad2deg(u[0, :]), color=PRIMARY_COLOR, linestyle=PRIMARY_STYLE, label=r'$\delta_1$')
-    ax.plot(t[:-1], np.rad2deg(u[1, :]), color=SECONDARY_COLOR, linestyle=SECONDARY_STYLE, label=r'$\delta_2$')
+    ax.plot(t[:-1], np.rad2deg(u[0, :]), color=PRIMARY_COLOR, linestyle='solid', label=r'$\delta_1$')
+    ax.plot(t[:-1], np.rad2deg(u[1, :]), color=SECONDARY_COLOR, linestyle='solid', label=r'$\delta_2$')
+    ax.set_xticklabels([])
     ax.set_yticks(np.arange(-15, 15 + 1, 7.5))
     ax.set_ylabel(r'$\boldsymbol{\delta} \quad (^\circ)$')
     ax.grid()
-    ax.legend()
+    ax.legend(loc='upper right')
     enforce_min_yrange(ax)
 
     ax = plt.subplot(236)
@@ -179,7 +183,7 @@ def plot_traj(name: str, x: np.ndarray, u: np.ndarray, t: np.ndarray, ref: np.nd
     ax.set_xlabel(r'$t \quad (s)$')
     ax.set_ylabel(r'$\boldsymbol{P} \quad (\%)$')
     ax.grid()
-    ax.legend()
+    ax.legend(loc='right')
     enforce_min_yrange(ax)
 
     save_fig(name)
