@@ -59,20 +59,24 @@ class MPCControl_base:
         x0_par = cp.Parameter(self.nx)
         xref_par = cp.Parameter(self.nx)
         uref_par = cp.Parameter(self.nu)
+
         self._x0_par = x0_par
         self._xref_par = xref_par
         self._uref_par = uref_par
 
-        dx = x - cp.reshape(xref_par, (self.nx, 1))
-        du = u - cp.reshape(uref_par, (self.nu, 1))
-        Q = self.Q
-        R = self.R
+        self.x_var = x
+        self.u_var = u
+
+        Q, R = self._get_stage_cost()
         Qf = self.Qf if hasattr(self, "Qf") else Q
 
         cost = 0
-        constraints = []
+        constraints: list[cp.Constraint] = []
 
         constraints += [x[:, 0] == x0_par]
+
+        dx = x - cp.reshape(xref_par, (self.nx, 1))
+        du = u - cp.reshape(uref_par, (self.nu, 1))
 
         for k in range(self.N):
             constraints += [x[:, k + 1] == self.A @ x[:, k] + self.B @ u[:, k]]
@@ -93,8 +97,9 @@ class MPCControl_base:
             constraints += [x[:, self.N] >= self.x_min]
             constraints += [x[:, self.N] <= self.x_max]
 
-        self._x_var = x
-        self._u_var = u
+        terminal_cost, terminal_constraints = self._get_terminal_cost_and_constraints()
+        cost += terminal_cost
+        constraints += terminal_constraints
         self.ocp = cp.Problem(cp.Minimize(cost), constraints)
 
     @staticmethod
@@ -102,16 +107,26 @@ class MPCControl_base:
         nx, nu = B.shape
         C = np.zeros((1, nx))
         D = np.zeros((1, nu))
-        A_discrete, B_discrete, _, _, _ = cont2discrete(system=(A, B, C, D), dt=Ts)
-        return A_discrete, B_discrete
+        Ad, Bd, _, _, _ = cont2discrete((A, B, C, D), dt=Ts)
+        return Ad, Bd
 
     def get_u(
         self, x0: np.ndarray, x_target: np.ndarray = None, u_target: np.ndarray = None
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        x0_red = x0[self.x_ids]
+        if x0.shape[0] != self.nx:  
+            x0_red = x0[self.x_ids].copy()  
+        else:  
+            x0_red = x0.copy()  
 
-        xref = self.xs if x_target is None else x_target[self.x_ids]
-        uref = self.us if u_target is None else u_target[self.u_ids]
+        if x_target is None: 
+            xref = self.xs.copy()  
+        else:  
+            xref = x_target[self.x_ids].copy() if x_target.shape[0] != self.nx else x_target.copy()  
+
+        if u_target is None: 
+            uref = self.us.copy()  
+        else: 
+            uref = u_target[self.u_ids].copy() if u_target.shape[0] != self.nu else u_target.copy()  
 
         self._x0_par.value = x0_red
         self._xref_par.value = xref
@@ -129,3 +144,11 @@ class MPCControl_base:
         u_traj = self._u_var.value
 
         return u0, x_traj, u_traj
+    
+    def _get_stage_cost(self) -> tuple[np.ndarray, np.ndarray]:  
+        return self.Q, self.R  
+
+    def _get_terminal_cost_and_constraints(self) -> tuple[cp.Expression, list[cp.Constraint]]:  
+        terminal_cost = 0.0  
+        terminal_constraints: list[cp.Constraint] = []  
+        return terminal_cost, terminal_constraints  
