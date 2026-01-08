@@ -39,3 +39,23 @@ class MPCControl_zvel(MPCControl_base):
 	
 		# Return cost and constraints
 		return terminalCost, constraints
+	
+	def setup_estimator(self):
+        # FOR PART 5 OF THE PROJECT
+        ##################################################
+        # YOUR CODE HERE
+
+        self.d_estimate = ...
+        self.d_gain = ...
+
+		
+        # YOUR CODE HERE
+        ##################################################
+
+    def update_estimator(self, x_data: np.ndarray, u_data: np.ndarray) -> None:
+        # FOR PART 5 OF THE PROJECT
+        ##################################################
+        # YOUR CODE HERE
+        self.d_estimate = a x + b
+        # YOUR CODE HERE
+        ##################################################
