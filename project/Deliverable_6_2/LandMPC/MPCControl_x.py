@@ -8,21 +8,23 @@ from mpt4py import Polyhedron
 BETA_MAX 		= 10.0					# °
 DELTA_2_MAX 	= 15.0					# °
 
-OMEGA_BETA_TYP 	= 10.0					# °/s
+OMEGA_BETA_TYP 	= 5.0					# °/s
 BETA_TYP 		= BETA_MAX / 2.0		# °
 V_X_TYP 		= 1.0					# m/s
+X_TYP			= 0.1					# m
 DELTA_2_TYP 	= DELTA_2_MAX / 2.0		# °
 
-class MPCControl_xvel(MPCControl_base):
+class MPCControl_x(MPCControl_base):
 
-	x_ids = np.array([1, 4, 6])
+	x_ids = np.array([1, 4, 6, 9])
 	u_ids = np.array([1])
 
 	def _get_stage_cost(self) -> tuple[np.ndarray, np.ndarray]:
 		Q = np.diag([
 			1.0 / np.deg2rad(OMEGA_BETA_TYP)**2,	# omega_beta cost
 			1.0 / np.deg2rad(BETA_TYP)**2,			# beta cost
-			1.0 / V_X_TYP**2						# v_x cost
+			1.0 / V_X_TYP**2,						# v_x cost
+			1.0 / X_TYP**2							# x cost
 		])
 		R = np.diag([
 			1.0 / np.deg2rad(DELTA_2_TYP)**2		# delta_2 cost
@@ -41,8 +43,8 @@ class MPCControl_xvel(MPCControl_base):
 		# Define state constraints
 
 		F = np.array([
-			[0.0, +1.0, 0.0], 			# beta <= +10°
-			[0.0, -1.0, 0.0] 			# beta >= -10°
+			[0.0, +1.0, 0.0, 0.0], 		# beta <= +10°
+			[0.0, -1.0, 0.0, 0.0] 		# beta >= -10°
 		])
 		f = np.array([
 			np.deg2rad(BETA_MAX),		# beta <= +10°
@@ -69,14 +71,21 @@ class MPCControl_xvel(MPCControl_base):
 		O = self._max_invariant_set(O, A_cl, self.N)
 		self.O_inf = O
 
-		# Define constraints
+		# Define constraints with slack variable
 
+		self.epsilon_var = cp.Variable((f.size, self.N), 'epsilon', nonneg=True)
 		constraints = [
-			X.A @ self.x_var[:, :-1]	<= X.b.reshape(-1, 1),	# State lies in state constraints
-			U.A @ self.u_var			<= U.b.reshape(-1, 1),	# Input lies in input constraints
-			O.A @ self.x_var[:, -1]		<= O.b.reshape(-1, 1)	# Final state lies in terminal set
+			X.A @ self.x_var[:, :-1]	<= X.b.reshape(-1, 1) + self.epsilon_var,	# State penalized for violating constraints
+			U.A @ self.u_var			<= U.b.reshape(-1, 1),						# Input lies in input constraints
+			O.A @ self.x_var[:, -1]		<= O.b.reshape(-1, 1)						# Final state lies in terminal set
 		]
 
-		# Return cost and constraints
+		# Add slack cost
 
+		S = 25.0 / np.deg2rad(BETA_MAX)**2
+		for i in range(self.N):
+			terminalCost += S * cp.norm1(self.epsilon_var[:, i])
+
+		# Return cost and constraints
+		
 		return terminalCost, constraints

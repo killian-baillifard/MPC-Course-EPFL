@@ -8,21 +8,23 @@ from mpt4py import Polyhedron
 ALPHA_MAX 		= 10.0					# °
 DELTA_1_MAX 	= 15.0					# °
 
-OMEGA_ALPHA_TYP = 10.0					# °/s
+OMEGA_ALPHA_TYP = 5.0					# °/s
 ALPHA_TYP 		= ALPHA_MAX / 2.0		# °
 V_Y_TYP 		= 1.0					# m/s
+Y_TYP			= 0.1					# m
 DELTA_1_TYP 	= DELTA_1_MAX / 2.0		# °
 
-class MPCControl_yvel(MPCControl_base):
+class MPCControl_y(MPCControl_base):
 
-	x_ids = np.array([0, 3, 7])
+	x_ids = np.array([0, 3, 7, 10])
 	u_ids = np.array([0])
 
 	def _get_stage_cost(self) -> tuple[np.ndarray, np.ndarray]:
 		Q = np.diag([
 			1.0 / np.deg2rad(OMEGA_ALPHA_TYP)**2,	# omega_alpha cost
 			1.0 / np.deg2rad(ALPHA_TYP)**2,			# alpha cost
-			1.0 / V_Y_TYP**2						# v_y cost
+			1.0 / V_Y_TYP**2,						# v_y cost
+			1.0 / Y_TYP**2,							# y cost
 		])
 		R = np.diag([
 			1.0 / np.deg2rad(DELTA_1_TYP)**2		# delta_1 cost
@@ -41,8 +43,8 @@ class MPCControl_yvel(MPCControl_base):
 		# Define state constraints
 
 		F = np.array([
-			[0.0, +1.0, 0.0], 			# alpha <= +10°
-			[0.0, -1.0, 0.0] 			# alpha >= -10°
+			[0.0, +1.0, 0.0, 0.0], 		# alpha <= +10°
+			[0.0, -1.0, 0.0, 0.0] 		# alpha >= -10°
 		])
 		f = np.array([
 			np.deg2rad(ALPHA_MAX),		# alpha <= +10°
@@ -80,7 +82,7 @@ class MPCControl_yvel(MPCControl_base):
 
 		# Add slack cost
 
-		S = 10.0 / np.deg2rad(ALPHA_MAX)**2
+		S = 25.0 / np.deg2rad(ALPHA_MAX)**2
 		for i in range(self.N):
 			terminalCost += S * cp.norm1(self.epsilon_var[:, i])
 
