@@ -7,7 +7,7 @@ P_AVG_MIN 		= 40.0	# %
 P_AVG_MAX 		= 80.0	# %
 
 V_Z_TYP 		= 1.0	# m/s
-DP_AVG_TYP 		= 100.0	# %
+DP_AVG_TYP 		= 10.0	# %
 
 LAMBDA 	= 0.0
 
@@ -54,8 +54,8 @@ class MPCControl_zvel(MPCControl_base):
 		])
 		self.C_aug = np.array([[1.0, 0.0]])
 
-		Qe = np.diag([1e-2, 1e-1])
-		Re = np.array([[1e-4]])
+		Qe = np.diag([1e-2, 1e-2])
+		Re = np.array([[1e-2]])
 		P = np.eye(2)
 
 		S = self.C_aug @ P @ self.C_aug.T + Re
