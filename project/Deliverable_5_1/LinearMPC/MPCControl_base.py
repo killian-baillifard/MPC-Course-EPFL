@@ -44,12 +44,8 @@ class MPCControl_base:
 		self.dx_var	 = cp.Variable((self.NX, self.N + 1), name='dx')
 		self.x0_par	 = cp.Parameter((self.NX, 1), name='x0')
 		self.xt_par  = cp.Parameter((self.NX, 1), name='xt')
-		self.d_par = cp.Parameter((1, 1), name='d')
-		self.d_par.value = np.zeros((1, 1))
-		self.Bd_par = cp.Parameter((self.NX, 1), name='Bd')
-		self.Bd_par.value = np.zeros((self.NX, 1))
-
-
+		self.d_par = cp.Parameter((self.NU, 1), name='d')
+		self.d_par.value = np.zeros((self.NU, 1))
 
 		self.us_par = cp.Parameter((self.NU, 1), name='us')
 		self.us_par.value = self.us.reshape(self.NU, 1)
@@ -66,13 +62,13 @@ class MPCControl_base:
 
 		# Define delta formulation
 
-		dist_term = (self.Bd_par @ self.d_par) @ np.ones((1, self.N))
+		dist_term = (self.B @ self.d_par) @ np.ones((1, self.N))
 
 		dynamics = [
 			self.dx_var			== self.x_var - self.xs_cst - self.xt_par,
-			self.du_var == self.u_var - self.us_par,
+			self.du_var 		== self.u_var - self.us_par,
 			self.dx_var[:, 0] 	== self.x0_par[:, 0] - self.xs_cst[:, 0] - self.xt_par[:, 0],
-			self.dx_var[:, 1:] == self.A @ self.dx_var[:, :-1] + self.B @ self.du_var + dist_term,
+			self.dx_var[:, 1:] 	== self.A @ self.dx_var[:, :-1] + self.B @ self.du_var + dist_term,
 		 ]
 
 		# Create optimization problem
@@ -130,14 +126,9 @@ class MPCControl_base:
 			self.update_estimator(x0, self.u_last)
 			self.d_par.value = np.array([[self.d_estimate]])
 
-		x_traj = np.zeros((self.NX, self.N + 1))
-		u_traj = np.zeros((self.NU, self.N))
-		x_traj[:, 0] = x0
-
-		self.xt_par.value = x_target.reshape(self.NX, 1)
-
 		# Solve optimization problem
 		self.x0_par.value = x0.reshape(self.NX, 1)
+		self.xt_par.value = x_target.reshape(self.NX, 1)
 		self.ocp.solve(solver=cp.PIQP)
 		assert self.ocp.status == cp.OPTIMAL
 
@@ -146,7 +137,6 @@ class MPCControl_base:
 		u_traj = self.u_var.value
 		u0 = u_traj[:, 0]
 		
-
 		if is_zvel:
 			self.u_last = np.array([float(u0[0])])
 	

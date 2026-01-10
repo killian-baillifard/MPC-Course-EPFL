@@ -7,7 +7,7 @@ P_AVG_MIN 		= 40.0	# %
 P_AVG_MAX 		= 80.0	# %
 
 V_Z_TYP 		= 1.0	# m/s
-DP_AVG_TYP 		= 10.0	# %
+DP_AVG_TYP 		= 100.0	# %
 
 LAMBDA 	= 0.0
 
@@ -42,7 +42,7 @@ class MPCControl_zvel(MPCControl_base):
 	
 	def setup_estimator(self):
         
-		bd = float(self.Bd_par.value[0, 0])
+		bd = float(self.B[0, 0])
 
 		self.A_aug = np.array([
 			[self.A[0, 0], bd],
@@ -58,10 +58,9 @@ class MPCControl_zvel(MPCControl_base):
 		Re = np.array([[1e-4]])
 		P = np.eye(2)
 
-		for _ in range(200):
-			S = self.C_aug @ P @ self.C_aug.T + Re
-			K = P @ self.C_aug.T @ np.linalg.inv(S)
-			P = self.A_aug @ (P - K @ self.C_aug @ P) @ self.A_aug.T + Qe
+		S = self.C_aug @ P @ self.C_aug.T + Re
+		K = P @ self.C_aug.T @ np.linalg.inv(S)
+		P = self.A_aug @ (P - K @ self.C_aug @ P) @ self.A_aug.T + Qe
 
 		self.K = K
 		self.xd_hat = np.zeros((2, 1))
