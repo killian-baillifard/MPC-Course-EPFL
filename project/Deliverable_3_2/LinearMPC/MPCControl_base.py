@@ -102,33 +102,17 @@ class MPCControl_base:
 		x_target: np.ndarray = None,
         u_target: np.ndarray = None
 	) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-		
-		# Allocate outputs
 
-		x_traj = np.zeros((self.NX, self.N + 1))
-		u_traj = np.zeros((self.NU, self.N))
-		x_traj[:, 0] = x0
+		# Solve optimization problem
 
-		# Set target
-
+		self.x0_par.value = x0.reshape(self.NX, 1)
 		self.xt_par.value = x_target.reshape(self.NX, 1)
+		self.ocp.solve(solver=cp.PIQP)
+		assert self.ocp.status == cp.OPTIMAL
 
-		# Closed-loop simulation
+		# Return open loop prediction
 
-		for k in range(self.N):
-
-			# Solve step
-
-			self.x0_par.value = x_traj[:, k].reshape(self.NX, 1)
-			self.ocp.solve(solver=cp.PIQP)
-			assert self.ocp.status == cp.OPTIMAL
-
-			# Save trajectory
-
-			x_traj[:, k + 1] = self.x_var.value[:, 1]
-			u_traj[:, k] = self.u_var.value[:, 0]
-
-		# Return predicted input and trajectories
-
+		x_traj = self.x_var.value
+		u_traj = self.u_var.value
 		u0 = u_traj[:, 0]
 		return u0, x_traj, u_traj
