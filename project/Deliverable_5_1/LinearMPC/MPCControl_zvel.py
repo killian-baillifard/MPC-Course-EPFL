@@ -41,21 +41,40 @@ class MPCControl_zvel(MPCControl_base):
 		return terminalCost, constraints
 	
 	def setup_estimator(self):
-        # FOR PART 5 OF THE PROJECT
-        ##################################################
-        # YOUR CODE HERE
+        
+		bd = float(self.Bd_par.value[0, 0])
 
-        self.d_estimate = ...
-        self.d_gain = ...
+		self.A_aug = np.array([
+			[self.A[0, 0], bd],
+			[0.0,          1.0]
+		])
+		self.B_aug = np.array([
+			[self.B[0, 0]],
+			[0.0]
+		])
+		self.C_aug = np.array([[1.0, 0.0]])
 
-		
-        # YOUR CODE HERE
-        ##################################################
+		Qe = np.diag([1e-2, 1e-1])
+		Re = np.array([[1e-4]])
+		P = np.eye(2)
 
-    def update_estimator(self, x_data: np.ndarray, u_data: np.ndarray) -> None:
-        # FOR PART 5 OF THE PROJECT
-        ##################################################
-        # YOUR CODE HERE
-        self.d_estimate = a x + b
-        # YOUR CODE HERE
-        ##################################################
+		for _ in range(200):
+			S = self.C_aug @ P @ self.C_aug.T + Re
+			K = P @ self.C_aug.T @ np.linalg.inv(S)
+			P = self.A_aug @ (P - K @ self.C_aug @ P) @ self.A_aug.T + Qe
+
+		self.K = K
+		self.xd_hat = np.zeros((2, 1))
+		self.d_estimate = 0.0
+		self.x_estimate = 0.0
+
+	def update_estimator(self, x_data, u_data) -> None:
+
+		y = float(np.array(x_data).reshape(-1)[0])
+		u = float(np.array(u_data).reshape(-1)[0])
+
+		y_hat = float(self.C_aug @ self.xd_hat)
+		self.xd_hat = self.A_aug @ self.xd_hat + self.B_aug * u + self.K * (y - y_hat)
+
+		self.x_estimate = float(self.xd_hat[0, 0])
+		self.d_estimate = float(self.xd_hat[1, 0])

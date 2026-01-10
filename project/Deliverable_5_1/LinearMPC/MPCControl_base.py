@@ -35,6 +35,8 @@ class MPCControl_base:
 		subB = B[np.meshgrid(self.x_ids, self.u_ids)].T
 		self.A, self.B = self._discretize(subA, subB, Ts)
 
+
+
 		# Create optimization variables and parameters with delta formulation
 
 		self.xs_cst	 = cp.Constant(self.xs.reshape(self.NX, 1), name='xs')
@@ -42,10 +44,15 @@ class MPCControl_base:
 		self.dx_var	 = cp.Variable((self.NX, self.N + 1), name='dx')
 		self.x0_par	 = cp.Parameter((self.NX, 1), name='x0')
 		self.xt_par  = cp.Parameter((self.NX, 1), name='xt')
-		self.d_par   = cp.Parameter((1, 1), name='d')
+		self.d_par = cp.Parameter((1, 1), name='d')
 		self.d_par.value = np.zeros((1, 1))
+		self.Bd_par = cp.Parameter((self.NX, 1), name='Bd')
+		self.Bd_par.value = np.zeros((self.NX, 1))
 
-		self.us_cst	= cp.Constant(self.us.reshape(self.NU, 1), name='us')
+
+
+		self.us_par = cp.Parameter((self.NU, 1), name='us')
+		self.us_par.value = self.us.reshape(self.NU, 1)
 		self.u_var 	= cp.Variable((self.NU, self.N), name='u')
 		self.du_var	= cp.Variable((self.NU, self.N), name='du')
 
@@ -59,15 +66,17 @@ class MPCControl_base:
 
 		# Define delta formulation
 
+		dist_term = (self.Bd_par @ self.d_par) @ np.ones((1, self.N))
+
 		dynamics = [
 			self.dx_var			== self.x_var - self.xs_cst - self.xt_par,
-			self.du_var			== self.u_var - self.us_cst,
+			self.du_var == self.u_var - self.us_par,
 			self.dx_var[:, 0] 	== self.x0_par[:, 0] - self.xs_cst[:, 0] - self.xt_par[:, 0],
-			self.dx_var[:, 1:] 	== self.A @ self.dx_var[:, :-1] + self.B @ self.du_var + self.B @ self.d_par,
-		]
+			self.dx_var[:, 1:] == self.A @ self.dx_var[:, :-1] + self.B @ self.du_var + dist_term,
+		 ]
 
 		# Create optimization problem
-		self.setup_estimator()
+
 		terminalCost, constraints = self._get_terminal_cost_and_constraints()
 		self.ocp = cp.Problem(cp.Minimize(cost + terminalCost), dynamics + constraints)
 
@@ -78,12 +87,6 @@ class MPCControl_base:
 	@abstractmethod
 	def _get_terminal_cost_and_constraints(self) -> tuple[Expression, list[Constraint]]:
 		pass
-
-	def setup_estimator(self):
-		pass
-
-	def update_estimator(self, x_data: np.ndarray, u_data: np.ndarray) -> None:
-		self.d_estimate = 0
 
 	@staticmethod
 	def _max_invariant_set(O: Polyhedron, A_cl: np.ndarray, max_iter: int = 30) -> Polyhedron:
@@ -111,37 +114,41 @@ class MPCControl_base:
         u_target: np.ndarray = None
 	) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
 		
-		# Allocate outputs
+		is_zvel = (self.NX == 1) and (int(self.x_ids[0]) == 8) and (int(self.u_ids[0]) == 2)
+
+		self.d_par.value = np.zeros((1, 1))
+
+		if is_zvel:
+			if not hasattr(self, "K"):
+				self.setup_estimator()
+				# Shift steady-state input to cancel disturbance
+				self.us_par.value = self.us.reshape(self.NU, 1) - self.d_estimate / self.B[0, 0]
+
+			if not hasattr(self, "u_last"):
+				self.u_last = np.array([float(self.us[0])])
+
+			self.update_estimator(x0, self.u_last)
+			self.d_par.value = np.array([[self.d_estimate]])
 
 		x_traj = np.zeros((self.NX, self.N + 1))
 		u_traj = np.zeros((self.NU, self.N))
 		x_traj[:, 0] = x0
 
-		# Estimate disturbance
-
-		self.update_estimator()
-		self.d_par.value[0, 0] = self.d_estimate
-
-		# Set target
-
 		self.xt_par.value = x_target.reshape(self.NX, 1)
 
-		# Closed-loop simulation
+		# Solve optimization problem
+		self.x0_par.value = x0.reshape(self.NX, 1)
+		self.ocp.solve(solver=cp.PIQP)
+		assert self.ocp.status == cp.OPTIMAL
 
-		for k in range(self.N):
-
-			# Solve step
-
-			self.x0_par.value = x_traj[:, k].reshape(self.NX, 1)
-			self.ocp.solve(solver=cp.PIQP)
-			assert self.ocp.status == cp.OPTIMAL
-
-			# Save trajectory
-
-			x_traj[:, k + 1] = self.x_var.value[:, 1]
-			u_traj[:, k] = self.u_var.value[:, 0]
-
-		# Return predicted input and trajectories
-
+		# Return open loop prediction
+		x_traj = self.x_var.value
+		u_traj = self.u_var.value
 		u0 = u_traj[:, 0]
+		
+
+		if is_zvel:
+			self.u_last = np.array([float(u0[0])])
+	
 		return u0, x_traj, u_traj
+

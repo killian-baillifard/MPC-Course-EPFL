@@ -19,6 +19,7 @@ class MPCControl_yvel(MPCControl_base):
 
 	x_ids = np.array([0, 3, 7])
 	u_ids = np.array([0])
+	
 
 	def _get_stage_cost(self) -> tuple[np.ndarray, np.ndarray]:
 		Q = np.exp(LAMBDA) * np.diag([
