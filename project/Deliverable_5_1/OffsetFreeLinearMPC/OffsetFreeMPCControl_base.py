@@ -38,12 +38,13 @@ class OffsetFreeMPCControl_base(MPCControl_base):
 
 		# Create optimization variables and parameters with delta formulation
 
-		self.xs_par	 = cp.Parameter((self.NX, 1), name='xs')
+		self.xs_cst	 = cp.Constant(self.xs, name='xs')
 		self.x0_par	 = cp.Parameter((self.NX, 1), name='x0')
 		self.x_var 	 = cp.Variable((self.NX, self.N + 1), name='x')
 		self.dx_var	 = cp.Variable((self.NX, self.N + 1), name='dx')
+		self.xt_par  = cp.Parameter((self.NX, 1), name='xt')
 
-		self.us_par	= cp.Parameter((self.NU, 1), name='us')
+		self.us_cst	= cp.Constant(self.us, name='us')
 		self.u_var 	= cp.Variable((self.NU, self.N), name='u')
 		self.du_var	= cp.Variable((self.NU, self.N), name='du')
 
@@ -66,9 +67,9 @@ class OffsetFreeMPCControl_base(MPCControl_base):
 		# Define delta formulation with disturbance
 
 		dynamics = [
-			self.dx_var			== self.x_var - self.xs_par,
-			self.du_var			== self.u_var - self.us_par,
-			self.dx_var[:, 0] 	== self.x0_par[:, 0] - self.xs_par[:, 0],
+			self.dx_var			== self.x_var - self.xs_cst - self.xt_par,
+			self.du_var			== self.u_var - self.us_cst,
+			self.dx_var[:, 0] 	== self.x0_par[:, 0] - self.xs_cst[:, 0] - self.xt_par[:, 0],
 			self.dx_var[:, 1:] 	== self.A @ self.dx_var[:, :-1] + self.B @ self.du_var + Bd @ self.d_hat,
 		]
 
@@ -76,14 +77,6 @@ class OffsetFreeMPCControl_base(MPCControl_base):
 
 		terminalCost, constraints = self._get_terminal_cost_and_constraints()
 		self.ocp = cp.Problem(cp.Minimize(cost + terminalCost), dynamics + constraints)
-
-	@abstractmethod
-	def _get_stage_cost(self) -> tuple[np.ndarray, np.ndarray]:
-		pass
-
-	@abstractmethod
-	def _get_terminal_cost_and_constraints(self) -> tuple[Expression, list[Constraint]]:
-		pass
 
 	@abstractmethod
 	def _setup_estimator(self) -> np.ndarray:
@@ -97,39 +90,22 @@ class OffsetFreeMPCControl_base(MPCControl_base):
 	def _update_estimator(self, x0: np.ndarray, u_last: np.ndarray) -> np.ndarray:
 		pass
 
-	@staticmethod
-	def _max_invariant_set(O: Polyhedron, A_cl: np.ndarray, max_iter: int = 30) -> Polyhedron:
-		for _ in range(max_iter):
-			Oprev = O
-			O = Polyhedron.from_Hrep(np.vstack([O.A, O.A @ A_cl]), np.vstack([O.b, O.b]).reshape(-1))
-			O.minHrep(True)
-			_ = O.Vrep
-			if O == Oprev:
-				return O
-		raise RuntimeError('Did not converge to maximum invariant set')
-
-	@staticmethod
-	def _discretize(A: np.ndarray, B: np.ndarray, Ts: float):
-		NX, NU = B.shape
-		C = np.zeros((1, NX))
-		D = np.zeros((1, NU))
-		A_discrete, B_discrete, _, _, _ = cont2discrete(system=(A, B, C, D), dt=Ts)
-		return A_discrete, B_discrete
-
 	def get_u(
 		self,
 		x0: np.ndarray,
 		x_target: np.ndarray = None,
         u_target: np.ndarray = None
 	) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-		
-		#xs, us = self._compute_steady_state(x_target)
-		self.xs_par.value = self.xs
-		self.us_par.value = self.us
+
+		# Estimate disturbance
+
+		z_hat = self._update_estimator(x0, self.u_prev)
+		self.x0_par.value = z_hat[:self.NX, :]
+		self.d_hat.value = z_hat[self.NX:, :]
 		
 		# Solve optimization problem
 
-		self.x0_par.value = x0.reshape(self.NX, 1)
+		self.xt_par.value = x_target.reshape(self.NX, 1)
 		self.ocp.solve(solver=cp.PIQP)
 		assert self.ocp.status == cp.OPTIMAL
 
@@ -138,10 +114,6 @@ class OffsetFreeMPCControl_base(MPCControl_base):
 		x_traj = self.x_var.value
 		u_traj = self.u_var.value
 		u0 = u_traj[:, 0:1]
-
-		# Estimate disturbance
-
-		self.d_hat.value = self._update_estimator(x0, self.u_prev)
 		self.u_prev = u0
 
 		# Return open loop prediction
