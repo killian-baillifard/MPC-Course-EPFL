@@ -7,36 +7,36 @@ from scipy.signal import cont2discrete
 
 # Input constraints
 
-DELTA_1_MAX 	= 15.0					# °
-DELTA_2_MAX 	= 15.0					# °
-P_AVG_MIN 		= 40.0	                # %
-P_AVG_MAX 		= 80.0	                # %
-P_DIFF_MAX 		= 20.0 				    # %
+DELTA_1_MAX 	= 15.0	# °
+DELTA_2_MAX 	= 15.0	# °
+P_AVG_MIN 		= 40.0	# %
+P_AVG_MAX 		= 80.0	# %
+P_DIFF_MAX 		= 20.0	# %
 
 # Typical states used for stage cost
 
-OMEGA_ALPHA_TYP = 15.0					# °/s
-OMEGA_BETA_TYP 	= 15.0					# °/s
-OMEGA_GAMMA_TYP = 30.0 				    # °/s
+OMEGA_ALPHA_TYP = 30.0	# °/s
+OMEGA_BETA_TYP 	= 30.0	# °/s
+OMEGA_GAMMA_TYP = 60.0	# °/s
 
-ALPHA_TYP 		= 10.0		            # °
-BETA_TYP 		= 10.0		            # °
-GAMMA_TYP 		= 1.0 				    # °
+ALPHA_TYP 		= 10.0	# °
+BETA_TYP 		= 10.0	# °
+GAMMA_TYP 		= 1.0	# °
 
-V_X_TYP 		= 2.0					# m/s
-V_Y_TYP 		= 2.0					# m/s
-V_Z_TYP 		= 4.0	                # m/s
+V_X_TYP 		= 1.0	# m/s
+V_Y_TYP 		= 1.0	# m/s
+V_Z_TYP 		= 2.0	# m/s
 
-X_TYP			= 0.1					# m
-Y_TYP			= 0.1					# m
-Z_TYP			= 0.1	                # m
+X_TYP			= 0.1	# m
+Y_TYP			= 0.1	# m
+Z_TYP			= 0.1	# m
 
 # Typical inputs used for stage cost
 
-DELTA_1_TYP 	= DELTA_1_MAX			# °
-DELTA_2_TYP 	= DELTA_2_MAX			# °
-P_AVG_TYP 		= 20.0	            	# %
-P_DIFF_TYP 		= P_DIFF_MAX 	    	# %
+DELTA_1_TYP 	= 10.0	# °
+DELTA_2_TYP 	= 10.0	# °
+P_AVG_TYP 		= 20.0	# %
+P_DIFF_TYP 		= 30.0	# %
 
 # Stage costs
 
