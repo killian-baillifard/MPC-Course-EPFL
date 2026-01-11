@@ -42,9 +42,6 @@ class MPCControl_base:
 		self.dx_var	 = cp.Variable((self.NX, self.N + 1), name='dx')
 		self.x0_par	 = cp.Parameter((self.NX, 1), name='x0')
 		self.xt_par  = cp.Parameter((self.NX, 1), name='xt')
-		self.w_par   = cp.Parameter((self.NX, 1), name='w')
-		self.w_par.value = np.zeros((self.NX, 1))
-
 
 		self.us_cst	= cp.Constant(self.us.reshape(self.NU, 1), name='us')
 		self.u_var 	= cp.Variable((self.NU, self.N), name='u')
@@ -64,7 +61,7 @@ class MPCControl_base:
 			self.dx_var			== self.x_var - self.xs_cst - self.xt_par,
 			self.du_var			== self.u_var - self.us_cst,
 			self.dx_var[:, 0] 	== self.x0_par[:, 0] - self.xs_cst[:, 0] - self.xt_par[:, 0],
-			self.dx_var[:, 1:] 	== self.A @ self.dx_var[:, :-1] + self.B @ self.du_var + self.w_par @ np.ones((1, self.N)),
+			self.dx_var[:, 1:] 	== self.A @ self.dx_var[:, :-1] + self.B @ self.du_var,
 		]
 
 		# Create optimization problem
@@ -106,48 +103,16 @@ class MPCControl_base:
         u_target: np.ndarray = None
 	) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
 		
-		# Allocate outputs
+		# Solve optimization problem
 
-		is_zvel = (self.NX == 1) and (int(self.x_ids[0]) == 8) and (int(self.u_ids[0]) == 2)
-
-		# Default: no disturbance
-		self.w_par.value = np.zeros((self.NX, 1))
-
-		if is_zvel:
-			if not hasattr(self, "d_hat"):
-				self.d_hat = 0.0  # initialize disturbance estimate once
-
-			vz_meas = float(x0[0])  # measured v_z
-			vz_ref = float(x_target[0]) if x_target is not None else 0.0
-			ki = 0.8  # integrator gain 
-			self.d_hat += ki * (vz_ref - vz_meas) * self.Ts
-
-			self.w_par.value = self.B.reshape(self.NX, 1) * self.d_hat
-
-		x_traj = np.zeros((self.NX, self.N + 1))
-		u_traj = np.zeros((self.NU, self.N))
-		x_traj[:, 0] = x0
-
-		# Set target
-
+		self.x0_par.value = x0.reshape(self.NX, 1)
 		self.xt_par.value = x_target.reshape(self.NX, 1)
+		self.ocp.solve(solver=cp.PIQP)
+		assert self.ocp.status == cp.OPTIMAL
 
-		# Closed-loop simulation
+		# Return open loop prediction
 
-		for k in range(self.N):
-
-			# Solve step
-
-			self.x0_par.value = x_traj[:, k].reshape(self.NX, 1)
-			self.ocp.solve(solver=cp.PIQP)
-			assert self.ocp.status == cp.OPTIMAL
-
-			# Save trajectory
-
-			x_traj[:, k + 1] = self.x_var.value[:, 1]
-			u_traj[:, k] = self.u_var.value[:, 0]
-
-		# Return predicted input and trajectories
-
+		x_traj = self.x_var.value
+		u_traj = self.u_var.value
 		u0 = u_traj[:, 0]
 		return u0, x_traj, u_traj
