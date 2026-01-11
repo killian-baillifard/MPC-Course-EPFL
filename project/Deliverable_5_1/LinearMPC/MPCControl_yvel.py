@@ -37,18 +37,18 @@ class MPCControl_yvel(MPCControl_base):
 
 		# Define constraints with slack variable
 
-		self.epsilon_var = cp.Variable((1, self.N), 'epsilon', nonneg=True)
+		self.epsilon_var = cp.Variable((1, self.N + 1), 'epsilon', nonneg=True)
 		constraints = [
-			self.x_var[1, :-1] 	<= +ALPHA_MAX + self.epsilon_var[0, :],
-			self.x_var[1, :-1] 	>= -ALPHA_MAX - self.epsilon_var[0, :],
-			self.u_var			<= +np.deg2rad(DELTA_1_MAX),
-			self.u_var 			>= -np.deg2rad(DELTA_1_MAX)
+			self.x_var[1] 	<= +ALPHA_MAX + self.epsilon_var[0],
+			self.x_var[1] 	>= -ALPHA_MAX - self.epsilon_var[0],
+			self.u_var		<= +np.deg2rad(DELTA_1_MAX),
+			self.u_var 		>= -np.deg2rad(DELTA_1_MAX)
 		]
 
 		# Add slack cost
 
 		S = 10.0 / np.deg2rad(ALPHA_MAX)**2
-		for i in range(self.N):
+		for i in range(self.N + 1):
 			terminalCost += S * cp.norm1(self.epsilon_var[:, i])
 
 		# Return cost and constraints

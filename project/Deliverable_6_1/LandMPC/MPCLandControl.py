@@ -28,7 +28,6 @@ class MPCLandControl:
 
         return self
 
-
     def get_u(
         self,
         t0: float,

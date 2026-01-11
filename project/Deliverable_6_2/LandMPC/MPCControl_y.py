@@ -8,7 +8,7 @@ from mpt4py import Polyhedron
 ALPHA_MAX 		= 10.0					# °
 DELTA_1_MAX 	= 15.0					# °
 
-OMEGA_ALPHA_TYP = 5.0					# °/s
+OMEGA_ALPHA_TYP = 10.0					# °/s
 ALPHA_TYP 		= ALPHA_MAX / 2.0		# °
 V_Y_TYP 		= 1.0					# m/s
 Y_TYP			= 0.1					# m
@@ -40,18 +40,18 @@ class MPCControl_y(MPCControl_base):
 
 		# Define constraints with slack variable
 
-		self.epsilon_var = cp.Variable((1, self.N), 'epsilon', nonneg=True)
+		self.epsilon_var = cp.Variable((1, self.N + 1), 'epsilon', nonneg=True)
 		constraints = [
-			self.x_var[1, :-1] 	<= +ALPHA_MAX + self.epsilon_var[0, :],
-			self.x_var[1, :-1] 	>= -ALPHA_MAX - self.epsilon_var[0, :],
-			self.u_var			<= +np.deg2rad(DELTA_1_MAX),
-			self.u_var 			>= -np.deg2rad(DELTA_1_MAX)
+			self.x_var[1] 	<= +ALPHA_MAX + self.epsilon_var[0],
+			self.x_var[1] 	>= -ALPHA_MAX - self.epsilon_var[0],
+			self.u_var		<= +np.deg2rad(DELTA_1_MAX),
+			self.u_var 		>= -np.deg2rad(DELTA_1_MAX)
 		]
 
 		# Add slack cost
 
 		S = 10.0 / np.deg2rad(ALPHA_MAX)**2
-		for i in range(self.N):
+		for i in range(self.N + 1):
 			terminalCost += S * cp.norm1(self.epsilon_var[:, i])
 
 		# Return cost and constraints
