@@ -13,21 +13,18 @@ ALPHA_TYP 		= ALPHA_MAX / 2.0		# °
 V_Y_TYP 		= 1.0					# m/s
 DELTA_1_TYP 	= DELTA_1_MAX / 2.0		# °
 
-LAMBDA 	= 0.0
-
 class MPCControl_yvel(MPCControl_base):
 
 	x_ids = np.array([0, 3, 7])
 	u_ids = np.array([0])
-	
 
 	def _get_stage_cost(self) -> tuple[np.ndarray, np.ndarray]:
-		Q = np.exp(LAMBDA) * np.diag([
+		Q = np.diag([
 			1.0 / np.deg2rad(OMEGA_ALPHA_TYP)**2,	# omega_alpha cost
 			1.0 / np.deg2rad(ALPHA_TYP)**2,			# alpha cost
 			1.0 / V_Y_TYP**2						# v_y cost
 		])
-		R = np.exp(-LAMBDA) * np.diag([
+		R = np.diag([
 			1.0 / np.deg2rad(DELTA_1_TYP)**2		# delta_1 cost
 		])
 		return Q, R
@@ -35,14 +32,14 @@ class MPCControl_yvel(MPCControl_base):
 	def _get_terminal_cost_and_constraints(self) -> tuple[Expression, list[Constraint]]:
 		
 		# Compute terminal controller
+
 		Q, R = self._get_stage_cost()
 		K, Qf, _ = dlqr(self.A, self.B, Q, R)
 		K = -K
-
-		# Define terminal cost
 		terminalCost = cp.quad_form(self.dx_var[:, -1], Qf)
 		
 		# Define state constraints
+
 		F = np.array([
 			[0.0, +1.0, 0.0], 			# alpha <= +10°
 			[0.0, -1.0, 0.0] 			# alpha >= -10°
@@ -54,6 +51,7 @@ class MPCControl_yvel(MPCControl_base):
 		X = Polyhedron.from_Hrep(F, f)
 		
 		# Define input constraints
+
 		G = np.array([	
 			[+1.0],						# delta_1 <= +15°
 			[-1.0]						# delta_1 >= -15°
@@ -65,23 +63,27 @@ class MPCControl_yvel(MPCControl_base):
 		U = Polyhedron.from_Hrep(G, g)
 
 		# Compute max invariant set
+
 		A_cl = self.A + self.B @ K
 		O = X.intersect(Polyhedron.from_Hrep(U.A @ K, U.b))
 		O = self._max_invariant_set(O, A_cl, self.N)
 		self.O_inf = O
 
 		# Define constraints with slack variable
+
 		self.epsilon_var = cp.Variable((f.size, self.N), 'epsilon', nonneg=True)
 		constraints = [
 			X.A @ self.x_var[:, :-1]	<= X.b.reshape(-1, 1) + self.epsilon_var,	# State penalized for violating constraints
 			U.A @ self.u_var			<= U.b.reshape(-1, 1),						# Input lies in input constraints
-			O.A @ self.x_var[:, -1]		<= O.b.reshape(-1, 1)						# Final state lies in terminal set
+			# O.A @ self.x_var[:, -1]		<= O.b.reshape(-1, 1)						# Final state lies in terminal set
 		]
 
 		# Add slack cost
+
 		S = 10.0 / np.deg2rad(ALPHA_MAX)**2
 		for i in range(self.N):
 			terminalCost += S * cp.norm1(self.epsilon_var[:, i])
 
 		# Return cost and constraints
+
 		return terminalCost, constraints
