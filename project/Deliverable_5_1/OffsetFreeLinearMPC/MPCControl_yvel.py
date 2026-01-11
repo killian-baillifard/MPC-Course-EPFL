@@ -3,7 +3,6 @@ import numpy as np
 from control import dlqr
 import cvxpy as cp
 from cvxpy import Expression, Constraint
-from mpt4py import Polyhedron
 
 ALPHA_MAX 		= 10.0					# °
 DELTA_1_MAX 	= 15.0					# °
@@ -31,43 +30,19 @@ class MPCControl_yvel(MPCControl_base):
 
 	def _get_terminal_cost_and_constraints(self) -> tuple[Expression, list[Constraint]]:
 		
-		# Compute terminal controller
+		# Define terminal cost
 
-		Q, R = self._get_stage_cost()
-		K, Qf, _ = dlqr(self.A, self.B, Q, R)
-		K = -K
-		terminalCost = cp.quad_form(self.dx_var[:, -1], Qf)
-		
-		# Define state constraints
-
-		F = np.array([
-			[0.0, +1.0, 0.0], 			# alpha <= +10°
-			[0.0, -1.0, 0.0] 			# alpha >= -10°
-		])
-		f = np.array([
-			np.deg2rad(ALPHA_MAX),		# alpha <= +10°
-			np.deg2rad(ALPHA_MAX)		# alpha >= -10°
-		])
-		X = Polyhedron.from_Hrep(F, f)
-		
-		# Define input constraints
-
-		G = np.array([	
-			[+1.0],						# delta_1 <= +15°
-			[-1.0]						# delta_1 >= -15°
-		])
-		g = np.array([
-			np.deg2rad(DELTA_1_MAX),	# delta_1 <= +15°
-			np.deg2rad(DELTA_1_MAX)		# delta_1 >= -15°
-		])
-		U = Polyhedron.from_Hrep(G, g)
+		Q, _ = self._get_stage_cost()
+		terminalCost = cp.quad_form(self.dx_var[:, -1], Q)
 
 		# Define constraints with slack variable
 
-		self.epsilon_var = cp.Variable((f.size, self.N), 'epsilon', nonneg=True)
+		self.epsilon_var = cp.Variable((1, self.N), 'epsilon', nonneg=True)
 		constraints = [
-			X.A @ self.x_var[:, :-1]	<= X.b.reshape(-1, 1) + self.epsilon_var,	# State penalized for violating constraints
-			U.A @ self.u_var			<= U.b.reshape(-1, 1)						# Input lies in input constraints
+			self.x_var[1, :-1] 	<= +ALPHA_MAX + self.epsilon_var[0, :],
+			self.x_var[1, :-1] 	>= -ALPHA_MAX - self.epsilon_var[0, :],
+			self.u_var			<= +np.deg2rad(DELTA_1_MAX),
+			self.u_var 			>= -np.deg2rad(DELTA_1_MAX)
 		]
 
 		# Add slack cost
